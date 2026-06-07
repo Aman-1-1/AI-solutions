@@ -1,12 +1,5 @@
 <?php
-/**
- * ============================================
- * AI-Solutions — Global Configuration
- * ============================================
- * Handles .env parsing, PDO database connection,
- * session initialization, and security helpers.
- * ============================================
- */
+
 
 // ── 1. Load Environment Variables ───────────────────────────────────────────
 function loadEnv(string $path): void

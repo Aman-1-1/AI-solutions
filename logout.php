@@ -1,12 +1,5 @@
 <?php
-/**
- * ============================================
- * AI-Solutions — Logout
- * ============================================
- * Destroys the admin session and redirects
- * back to the homepage.
- * ============================================
- */
+
 require_once __DIR__ . '/config.php';
 
 // Clear all session data

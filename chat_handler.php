@@ -4,16 +4,53 @@
  * AI-Solutions — Gemini Chat Handler
  * ============================================
  * Receives AJAX messages from the chatbot UI,
- * forwards them to the Google Gemini API with
- * a system prompt, and returns the response.
- * Maintains conversation history in session.
+ * stores/retrieves messages from SQLite, forwards
+ * to Gemini API, and links guest chats upon login.
  * ============================================
  */
 require_once __DIR__ . '/config.php';
 
 header('Content-Type: application/json');
 
-// Only accept POST requests
+// Ensure unique chat session ID exists
+if (empty($_SESSION['chat_session_id'])) {
+    $_SESSION['chat_session_id'] = bin2hex(random_bytes(16));
+}
+$sessionId = $_SESSION['chat_session_id'];
+$userId = isLoggedIn() ? $_SESSION['user_id'] : null;
+
+// Link guest chats if logged in
+if ($userId) {
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("UPDATE chat_messages SET user_id = :user_id WHERE session_id = :session_id AND user_id IS NULL");
+        $stmt->execute([':user_id' => $userId, ':session_id' => $sessionId]);
+    } catch (PDOException $e) {
+        error_log('Error linking guest messages: ' . $e->getMessage());
+    }
+}
+
+// ── GET Request: Fetch Chat History ─────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    try {
+        $db = getDB();
+        if ($userId) {
+            $stmt = $db->prepare("SELECT sender, message, created_at FROM chat_messages WHERE user_id = :user_id ORDER BY id ASC");
+            $stmt->execute([':user_id' => $userId]);
+        } else {
+            $stmt = $db->prepare("SELECT sender, message, created_at FROM chat_messages WHERE session_id = :session_id AND user_id IS NULL ORDER BY id ASC");
+            $stmt->execute([':session_id' => $sessionId]);
+        }
+        $messages = $stmt->fetchAll();
+        echo json_encode(['messages' => $messages]);
+    } catch (PDOException $e) {
+        error_log('Error fetching chat history: ' . $e->getMessage());
+        echo json_encode(['messages' => []]);
+    }
+    exit;
+}
+
+// Only accept POST requests for sending messages
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['reply' => 'Method not allowed.']);
@@ -33,7 +70,7 @@ if ($message === '') {
 $apiKey = env('GEMINI_API_KEY', '');
 if ($apiKey === '' || $apiKey === 'your_gemini_api_key_here') {
     echo json_encode([
-        'reply' => 'The AI assistant is not configured yet. Please set the GEMINI_API_KEY in the .env file. You can get a key from https://aistudio.google.com/app/apikey'
+        'reply' => 'The AI assistant is not configured yet. Please set the GEMINI_API_KEY in the .env file.'
     ]);
     exit;
 }
@@ -58,25 +95,51 @@ Your behaviour rules:
 - Respond in the same language the user writes in.
 PROMPT;
 
-// ── Conversation History (Session-based) ────────────────────────────────────
-if (!isset($_SESSION['chat_history'])) {
-    $_SESSION['chat_history'] = [];
+// ── Save User Message to DB ─────────────────────────────────────────────────
+try {
+    $db = getDB();
+    $stmt = $db->prepare("INSERT INTO chat_messages (session_id, user_id, sender, message) VALUES (:session_id, :user_id, 'user', :message)");
+    $stmt->execute([
+        ':session_id' => $sessionId,
+        ':user_id'    => $userId,
+        ':message'    => $message
+    ]);
+} catch (PDOException $e) {
+    error_log('Error saving user message: ' . $e->getMessage());
 }
 
-// Build the contents array with history for multi-turn dialogue
-$contents = [];
-
-// Add conversation history (last 10 turns max to stay within token limits)
-$history = array_slice($_SESSION['chat_history'], -20);
-foreach ($history as $turn) {
-    $contents[] = $turn;
+// ── Load Conversation History for Gemini ─────────────────────────────────────
+$historyLimit = 16; // last 16 messages (8 turns) to build context
+$history = [];
+try {
+    $db = getDB();
+    if ($userId) {
+        $stmt = $db->prepare("SELECT sender, message FROM chat_messages WHERE user_id = :user_id ORDER BY id DESC LIMIT :limit");
+        $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+    } else {
+        $stmt = $db->prepare("SELECT sender, message FROM chat_messages WHERE session_id = :session_id AND user_id IS NULL ORDER BY id DESC LIMIT :limit");
+        $stmt->bindValue(':session_id', $sessionId, PDO::PARAM_STR);
+    }
+    $stmt->bindValue(':limit', $historyLimit, PDO::PARAM_INT);
+    $stmt->execute();
+    $rawHistory = array_reverse($stmt->fetchAll());
+    
+    foreach ($rawHistory as $row) {
+        $history[] = [
+            'role'  => $row['sender'] === 'user' ? 'user' : 'model',
+            'parts' => [['text' => $row['message']]]
+        ];
+    }
+} catch (PDOException $e) {
+    error_log('Error building chat history context: ' . $e->getMessage());
+    // Fallback to current message only
+    $history = [
+        [
+            'role'  => 'user',
+            'parts' => [['text' => $message]]
+        ]
+    ];
 }
-
-// Add the new user message
-$contents[] = [
-    'role'  => 'user',
-    'parts' => [['text' => $message]]
-];
 
 // ── Call Google Gemini API ───────────────────────────────────────────────────
 $model    = 'gemini-2.5-flash';
@@ -86,7 +149,7 @@ $payload = [
     'system_instruction' => [
         'parts' => [['text' => $systemPrompt]]
     ],
-    'contents'           => $contents,
+    'contents'           => $history,
     'generationConfig'   => [
         'temperature'     => 0.7,
         'topP'            => 0.9,
@@ -126,14 +189,17 @@ if ($httpCode !== 200) {
 $data  = json_decode($response, true);
 $reply = $data['candidates'][0]['content']['parts'][0]['text'] ?? 'I\'m sorry, I couldn\'t generate a response.';
 
-// ── Update Session History ──────────────────────────────────────────────────
-$_SESSION['chat_history'][] = [
-    'role'  => 'user',
-    'parts' => [['text' => $message]]
-];
-$_SESSION['chat_history'][] = [
-    'role'  => 'model',
-    'parts' => [['text' => $reply]]
-];
+// ── Save Bot Reply to DB ────────────────────────────────────────────────────
+try {
+    $db = getDB();
+    $stmt = $db->prepare("INSERT INTO chat_messages (session_id, user_id, sender, message) VALUES (:session_id, :user_id, 'bot', :message)");
+    $stmt->execute([
+        ':session_id' => $sessionId,
+        ':user_id'    => $userId,
+        ':message'    => $reply
+    ]);
+} catch (PDOException $e) {
+    error_log('Error saving bot reply: ' . $e->getMessage());
+}
 
 echo json_encode(['reply' => $reply]);

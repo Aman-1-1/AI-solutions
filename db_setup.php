@@ -49,6 +49,7 @@ try {
             phone       TEXT    NOT NULL DEFAULT '',
             company     TEXT    NOT NULL DEFAULT '',
             country     TEXT    NOT NULL DEFAULT '',
+            job_title   TEXT    NOT NULL DEFAULT '',
             details     TEXT    NOT NULL DEFAULT '',
             status      TEXT    NOT NULL DEFAULT 'pending',
             submitted_at TEXT   NOT NULL DEFAULT (datetime('now'))
@@ -65,9 +66,63 @@ try {
         $db->exec("ALTER TABLE inquiries ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'");
         echo "[✓] Migrated 'inquiries' table: added 'status' column.\n";
     }
+    if (!in_array('job_title', $cols)) {
+        $db->exec("ALTER TABLE inquiries ADD COLUMN job_title TEXT NOT NULL DEFAULT ''");
+        echo "[✓] Migrated 'inquiries' table: added 'job_title' column.\n";
+    }
     echo "[✓] Table 'inquiries' created/verified.\n";
 
-    // ── 3. Seed default admin user ──────────────────────────────────────────
+    // ── 3.5. Create 'blogs' and 'gallery' tables ───────────────────────────
+    $db->exec("
+        CREATE TABLE IF NOT EXISTS blogs (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            title       TEXT    NOT NULL,
+            category    TEXT    NOT NULL,
+            content     TEXT    NOT NULL,
+            icon        TEXT    NOT NULL DEFAULT '🧠',
+            created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+        )
+    ");
+    echo "[✓] Table 'blogs' created/verified.\n";
+
+    $db->exec("
+        CREATE TABLE IF NOT EXISTS gallery (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            title       TEXT    NOT NULL,
+            description TEXT    NOT NULL,
+            icon        TEXT    NOT NULL DEFAULT '📷',
+            color_theme TEXT    NOT NULL DEFAULT 'purple',
+            created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+        )
+    ");
+    echo "[✓] Table 'gallery' created/verified.\n";
+
+    // Seed blogs if empty
+    $count = $db->query("SELECT COUNT(*) FROM blogs")->fetchColumn();
+    if ($count == 0) {
+        $db->exec("
+            INSERT INTO blogs (title, category, content, icon) VALUES 
+            ('The Future of Agentic Workflows', 'AI Article', 'How autonomous, multi-step AI systems are replacing traditional software pipelines in enterprise environments.', '🧠'),
+            ('AI-Solutions Agent V2 is Live', 'Company News', 'Our next-generation assistant model is now available to all clients, featuring faster responses and better context handling.', '🚀'),
+            ('Why Prototyping First Saves Money', 'Guide', 'A practical look at why building a quick prototype before full development saves time, money, and frustration.', '📋')
+        ");
+        echo "[✓] Seeded default blogs.\n";
+    }
+
+    // Seed gallery if empty
+    $count = $db->query("SELECT COUNT(*) FROM gallery")->fetchColumn();
+    if ($count == 0) {
+        $db->exec("
+            INSERT INTO gallery (title, description, icon, color_theme) VALUES 
+            ('AI Hackathon 2026', 'Building custom AI agents in 48 hours as a team.', '💻', 'purple'),
+            ('Developer Summit', 'Presenting new AI tools to industry leaders and partners.', '📢', 'yellow'),
+            ('Client Workshop', 'Hands-on API integration sessions with client teams.', '🤝', 'green'),
+            ('Brainstorm Meetup', 'Monthly team sessions to design upcoming AI products.', '💡', 'red')
+        ");
+        echo "[✓] Seeded default gallery items.\n";
+    }
+
+    // ── 4. Seed default admin user ──────────────────────────────────────────
     $adminUser = env('ADMIN_USERNAME', 'admin');
     $adminPass = env('ADMIN_PASSWORD', 'admin');
 

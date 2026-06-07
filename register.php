@@ -1,20 +1,12 @@
 <?php
 /**
- * ============================================
  * AI-Solutions — User Registration
- * ============================================
- * Secure registration page for regular users.
- * ============================================
  */
 require_once __DIR__ . '/config.php';
 
 // If already logged in, redirect based on role
 if (isLoggedIn()) {
-    if (isAdmin()) {
-        redirect('dashboard.php');
-    } else {
-        redirect('user_dashboard.php');
-    }
+    redirect(isAdmin() ? 'dashboard.php' : 'user_dashboard.php');
 }
 
 $error = '';
@@ -68,42 +60,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Create Account — AI-Solutions</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Create Account — AI-Solutions</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="auth-page">
   <div class="auth-card">
-    <a href="index.php" class="nav-logo" style="display:inline-block;margin-bottom:24px;font-size:1.6rem">AI-Solutions<span>.</span></a>
+    <a href="index.php" class="nav-logo" style="display:inline-block;margin-bottom:24px;">AI<span>Solutions</span></a>
     <h1>Create Account</h1>
-    <p class="subtitle">Sign up to request demos and track your inquiry status.</p>
+    <p class="subtitle">Sign up to submit inquiries and track requests.</p>
 
     <?php if ($error): ?>
-      <div class="flash flash-error"><?= e($error) ?></div>
+      <div class="flash flash-error" style="margin:14px 0;"><?= e($error) ?></div>
     <?php endif; ?>
 
-    <form method="POST" action="register.php">
+    <form method="POST" action="register.php" style="margin-top:8px;">
       <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:14px;">
         <label for="username">Username</label>
         <input type="text" id="username" name="username" placeholder="Choose a username" required autofocus>
       </div>
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:14px;">
         <label for="password">Password</label>
         <input type="password" id="password" name="password" placeholder="At least 6 characters" required>
       </div>
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:14px;">
         <label for="confirm_password">Confirm Password</label>
         <input type="password" id="confirm_password" name="confirm_password" placeholder="Repeat password" required>
       </div>
-      <button type="submit" class="btn btn-primary btn-submit">Register Account →</button>
+      <button type="submit" class="btn btn-primary btn-submit" style="margin-top:6px;">Register Account</button>
     </form>
-    <p style="margin-top:24px;font-size:.8rem;color:var(--text-secondary)">
-      Already have an account? <a href="login.php" style="font-weight:600">Sign In</a>
+    <p style="margin-top:20px;font-size:.85rem;color:var(--text-mid);">
+      Already have an account? <a href="login.php" style="font-weight:700;color:var(--accent);">Sign In</a>
     </p>
-    <p style="margin-top:16px;font-size:.8rem;color:var(--text-muted)"><a href="index.php">← Back to Homepage</a></p>
+    <p style="margin-top:8px;font-size:.82rem;">
+      <a href="index.php" style="color:var(--text-light);">← Back to Homepage</a>
+    </p>
   </div>
 </div>
 </body>

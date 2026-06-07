@@ -1,27 +1,16 @@
 <?php
 /**
- * ============================================
- * AI-Solutions — Admin Login
- * ============================================
- * Secure login page using PHP sessions and
- * bcrypt password verification.
- * ============================================
+ * AI-Solutions — Login
  */
 require_once __DIR__ . '/config.php';
 
-// If already logged in, redirect based on role
 if (isLoggedIn()) {
-    if (isAdmin()) {
-        redirect('dashboard.php');
-    } else {
-        redirect('user_dashboard.php');
-    }
+    redirect(isAdmin() ? 'dashboard.php' : 'user_dashboard.php');
 }
 
 $flash = getFlash();
 $error = '';
 
-// ── Handle Login Submission ─────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $token = $_POST['csrf_token'] ?? '';
     if (!validateCsrf($token)) {
@@ -29,7 +18,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $username = trim($_POST['username'] ?? '');
         $password = $_POST['password'] ?? '';
-
         if ($username === '' || $password === '') {
             $error = 'Both fields are required.';
         } else {
@@ -38,21 +26,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $db->prepare("SELECT id, username, password, role FROM users WHERE username = :username LIMIT 1");
                 $stmt->execute([':username' => $username]);
                 $user = $stmt->fetch();
-
                 if ($user && password_verify($password, $user['password'])) {
-                    // Regenerate session ID to prevent fixation
                     session_regenerate_id(true);
                     $_SESSION['user_id']   = $user['id'];
                     $_SESSION['username']  = $user['username'];
-                    $_SESSION['user_role']  = $user['role'];
-                    // Clear CSRF token so a fresh one is generated
+                    $_SESSION['user_role'] = $user['role'];
                     unset($_SESSION['csrf_token']);
-
-                    if ($user['role'] === 'admin') {
-                        redirect('dashboard.php');
-                    } else {
-                        redirect('user_dashboard.php');
-                    }
+                    redirect($user['role'] === 'admin' ? 'dashboard.php' : 'user_dashboard.php');
                 } else {
                     $error = 'Invalid username or password.';
                 }
@@ -67,41 +47,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Sign In — AI-Solutions</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sign In — AI-Solutions</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="auth-page">
   <div class="auth-card">
-    <a href="index.php" class="nav-logo" style="display:inline-block;margin-bottom:24px;font-size:1.6rem">AI-Solutions<span>.</span></a>
+    <a href="index.php" class="nav-logo" style="display:inline-block;margin-bottom:24px;">AI<span>Solutions</span></a>
     <h1>Sign In</h1>
     <p class="subtitle">Enter your credentials to access your account.</p>
 
     <?php if ($error): ?>
-      <div class="flash flash-error"><?= e($error) ?></div>
+      <div class="flash flash-error" style="margin:14px 0;"><?= e($error) ?></div>
     <?php endif; ?>
     <?php if ($flash): ?>
-      <div class="flash flash-<?= e($flash['type']) ?>"><?= e($flash['message']) ?></div>
+      <div class="flash flash-<?= e($flash['type']) ?>" style="margin:14px 0;"><?= e($flash['message']) ?></div>
     <?php endif; ?>
 
-    <form method="POST" action="login.php">
+    <form method="POST" action="login.php" style="margin-top:8px;">
       <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
       <div class="form-group">
         <label for="username">Username</label>
-        <input type="text" id="username" name="username" placeholder="Username" required autofocus>
+        <input type="text" id="username" name="username" placeholder="your_username" required autofocus>
       </div>
       <div class="form-group">
         <label for="password">Password</label>
         <input type="password" id="password" name="password" placeholder="••••••••" required>
       </div>
-      <button type="submit" class="btn btn-primary btn-submit">Sign In →</button>
+      <button type="submit" class="btn btn-primary btn-submit" style="margin-top:6px;">Sign In</button>
     </form>
-    <p style="margin-top:24px;font-size:.8rem;color:var(--text-secondary)">
-      Don't have an account? <a href="register.php" style="font-weight:600">Create one</a>
+    <p style="margin-top:20px;font-size:.85rem;color:var(--text-mid);">
+      No account? <a href="register.php" style="font-weight:700;color:var(--accent);">Register here</a>
     </p>
-    <p style="margin-top:16px;font-size:.8rem;color:var(--text-muted)"><a href="index.php">← Back to Homepage</a></p>
+    <p style="margin-top:8px;font-size:.82rem;">
+      <a href="index.php" style="color:var(--text-light);">← Back to Homepage</a>
+    </p>
   </div>
 </div>
 </body>
