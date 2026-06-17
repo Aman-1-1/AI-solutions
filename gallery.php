@@ -28,8 +28,8 @@ try {
     <a href="index.php" class="nav-logo">AI<span>Solutions</span></a>
     <div class="nav-links" id="navLinks">
       <a href="index.php">Homepage</a>
-      <a href="blog.php">Blog</a>
-      <a href="gallery.php" class="active">Gallery</a>
+      <a href="<?= isAdmin() ? 'dashboard.php?tab=blogs' : 'blog.php' ?>">Blog</a>
+      <a href="<?= isAdmin() ? 'dashboard.php?tab=gallery' : 'gallery.php' ?>" class="<?= !isAdmin() ? 'active' : '' ?>">Gallery</a>
       <?php if (isLoggedIn()): ?>
         <a href="<?= isAdmin() ? 'dashboard.php' : 'user_dashboard.php' ?>" class="nav-cta">Workspace</a>
       <?php else: ?>

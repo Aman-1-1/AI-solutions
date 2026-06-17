@@ -206,8 +206,9 @@ try {
       <a href="index.php" class="nav-logo">AI<span>Solutions</span></a>
       <div class="nav-links" id="navLinks">
         <a href="index.php">Homepage</a>
-        <a href="blog.php">Blog</a>
-        <a href="gallery.php">Gallery</a>
+        <a href="dashboard.php?tab=inquiries" class="<?= $tab === 'inquiries' ? 'active' : '' ?>">Inquiries</a>
+        <a href="dashboard.php?tab=blogs" class="<?= $tab === 'blogs' ? 'active' : '' ?>">Blog</a>
+        <a href="dashboard.php?tab=gallery" class="<?= $tab === 'gallery' ? 'active' : '' ?>">Gallery</a>
         <a href="logout.php" class="nav-cta" style="background:transparent; color:var(--text-mid); border:1px solid var(--border);">Sign Out</a>
       </div>
     </div>
@@ -220,6 +221,10 @@ try {
         <div>
           <h1 style="font-family:'DM Serif Display', serif; font-size:2.2rem; font-weight:400; line-height:1.2;">Admin Workspace</h1>
           <p style="color:var(--text-light); font-size:.9rem; margin-top:4px;">Signed in as <strong><?= e($_SESSION['username'] ?? 'Admin') ?></strong> (Administrator)</p>
+        </div>
+        <div style="display:flex; gap:12px;">
+          <a href="blog.php" class="btn btn-outline btn-sm" target="_blank" style="padding: 6px 14px; font-size: 0.82rem; border-radius: var(--radius-sm);">View Public Blog</a>
+          <a href="gallery.php" class="btn btn-outline btn-sm" target="_blank" style="padding: 6px 14px; font-size: 0.82rem; border-radius: var(--radius-sm);">View Public Gallery</a>
         </div>
       </div>
 
