@@ -51,31 +51,34 @@ try {
     <?php if (!empty($gallery)): ?>
       <?php foreach ($gallery as $item): ?>
         <?php
-          // Map color theme to background/text colors
-          $bg_color = '#ede9ff';
-          $text_color = 'var(--accent)';
-          if ($item['color_theme'] === 'yellow') {
-              $bg_color = '#fef7e6';
-              $text_color = 'var(--yellow)';
-          } elseif ($item['color_theme'] === 'green') {
-              $bg_color = '#e6f7ee';
-              $text_color = 'var(--green)';
-          } elseif ($item['color_theme'] === 'red') {
-              $bg_color = '#fdeaea';
-              $text_color = 'var(--red)';
+          $has_image = !empty($item['image_path']);
+          $img_src = $has_image ? e($item['image_path']) : '';
+          if ($has_image) {
+              $media_html = '<img src="' . $img_src . '" alt="' . e($item['title']) . '">';
+          } else {
+              $media_html = '<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background: linear-gradient(135deg, var(--accent-soft) 0%, var(--bg-soft) 100%);"><svg class="svg-icon" style="width:40px; height:40px; color:var(--accent);" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>';
           }
         ?>
-        <div class="feature-card" style="padding: 0; overflow: hidden; text-align: center;">
-          <div style="height: 180px; background: <?= $bg_color ?>; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; border-bottom: 1px solid var(--border);">
-            <span style="font-size: 2.5rem;"><?= e($item['icon']) ?></span>
-            <strong style="font-size: 1.05rem; color: <?= $text_color ?>;"><?= e($item['title']) ?></strong>
+        <div class="feature-card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column; cursor: pointer;" onclick="openContentModal('gallery', <?= htmlspecialchars(json_encode($item['title']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($item['description']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($media_html), ENT_QUOTES, 'UTF-8') ?>, 'Gallery Item')">
+          <div class="gallery-img-container">
+            <?php if ($has_image): ?>
+              <img src="<?= e($item['image_path']) ?>" alt="<?= e($item['title']) ?>" class="gallery-img">
+            <?php else: ?>
+              <!-- Clean premium SVG graphic placeholder as fallback -->
+              <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background: linear-gradient(135deg, var(--accent-soft) 0%, var(--bg-soft) 100%);">
+                <svg class="svg-icon" style="width:40px; height:40px; color:var(--accent);" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+              </div>
+            <?php endif; ?>
           </div>
-          <p style="padding: 18px; font-size: .88rem; color: var(--text-mid); line-height: 1.5;"><?= e($item['description']) ?></p>
+          <div style="padding: 20px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+            <strong style="font-size: 1.05rem; color: var(--text); margin-bottom: 6px; display: block;"><?= e($item['title']) ?></strong>
+            <p style="font-size: .85rem; color: var(--text-mid); line-height: 1.5;"><?= e($item['description']) ?></p>
+          </div>
         </div>
       <?php endforeach; ?>
     <?php else: ?>
       <div style="grid-column: 1 / -1; text-align: center; padding: 60px 24px; color: var(--text-light);">
-        <div style="font-size: 2.5rem; margin-bottom: 12px;">📷</div>
+        <svg viewBox="0 0 24 24" style="width:48px; height:48px; stroke:var(--text-light); fill:none; stroke-width:2; margin-bottom:12px; display:inline-block;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
         <p style="font-weight: 600;">No gallery items added yet.</p>
       </div>
     <?php endif; ?>
@@ -88,6 +91,55 @@ try {
     <p>&copy; <?= date('Y') ?> AI-Solutions. All rights reserved.</p>
   </div>
 </footer>
+
+<!-- Content Modal -->
+<div id="contentModal" class="modal-backdrop" onclick="closeContentModal(event)">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeContentModal(event)">&times;</button>
+    <div id="modalMedia" class="modal-media"></div>
+    <div class="modal-body">
+      <span id="modalCategory" class="overline" style="color: var(--accent); margin-bottom: 8px; display: inline-block;"></span>
+      <h3 id="modalTitle" style="font-family: 'DM Serif Display', serif; font-size: 1.8rem; font-weight: 400; margin-bottom: 12px; color: var(--text);"></h3>
+      <div id="modalContent" style="font-size: 0.95rem; color: var(--text-mid); line-height: 1.6; white-space: pre-wrap;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function openContentModal(type, title, content, mediaHtml, category = '') {
+    const modal = document.getElementById('contentModal');
+    const modalMedia = document.getElementById('modalMedia');
+    const modalCategory = document.getElementById('modalCategory');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalContent = document.getElementById('modalContent');
+    
+    modalMedia.innerHTML = mediaHtml || '';
+    if (category) {
+        modalCategory.innerText = category;
+        modalCategory.style.display = 'inline-block';
+    } else {
+        modalCategory.style.display = 'none';
+    }
+    modalTitle.innerText = title;
+    modalContent.innerText = content;
+    
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeContentModal(event) {
+    if (event) event.preventDefault();
+    const modal = document.getElementById('contentModal');
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeContentModal();
+    }
+});
+</script>
 
 </body>
 </html>

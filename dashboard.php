@@ -77,24 +77,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         elseif ($action === 'add_gallery') {
             $title = trim($_POST['title'] ?? '');
             $description = trim($_POST['description'] ?? '');
-            $icon = trim($_POST['icon'] ?? '📷');
-            $color_theme = trim($_POST['color_theme'] ?? 'purple');
+            $image_path = null;
 
             if ($title === '' || $description === '') {
-                setFlash('error', 'All fields are required.');
+                setFlash('error', 'Title and description are required.');
             } else {
-                try {
-                    $stmt = $db->prepare("INSERT INTO gallery (title, description, icon, color_theme) VALUES (:title, :description, :icon, :color_theme)");
-                    $stmt->execute([
-                        ':title' => $title,
-                        ':description' => $description,
-                        ':icon' => $icon,
-                        ':color_theme' => $color_theme
-                    ]);
-                    setFlash('success', 'Gallery item added successfully.');
-                } catch (PDOException $e) {
-                    error_log('Add gallery error: ' . $e->getMessage());
-                    setFlash('error', 'Failed to add gallery item.');
+                // Handle file upload
+                if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+                    $fileTmpPath = $_FILES['image']['tmp_name'];
+                    $fileName = $_FILES['image']['name'];
+                    $fileSize = $_FILES['image']['size'];
+                    $fileNameCmps = explode(".", $fileName);
+                    $fileExtension = strtolower(end($fileNameCmps));
+
+                    $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+                    if (in_array($fileExtension, $allowedExtensions)) {
+                        if ($fileSize <= 5 * 1024 * 1024) { // 5MB limit
+                            $uploadFileDir = __DIR__ . '/uploads/';
+                            if (!is_dir($uploadFileDir)) {
+                                mkdir($uploadFileDir, 0755, true);
+                            }
+                            $newFileName = md5(time() . $fileName) . '.' . $fileExtension;
+                            $dest_path = $uploadFileDir . $newFileName;
+
+                            if (move_uploaded_file($fileTmpPath, $dest_path)) {
+                                $image_path = 'uploads/' . $newFileName;
+                            } else {
+                                setFlash('error', 'Error moving the uploaded file.');
+                            }
+                        } else {
+                            setFlash('error', 'File size exceeds 5MB limit.');
+                        }
+                    } else {
+                        setFlash('error', 'Allowed file types: JPG, JPEG, PNG, WEBP.');
+                    }
+                } else {
+                    setFlash('error', 'Please select an image file to upload.');
+                }
+
+                if ($image_path !== null) {
+                    try {
+                        $stmt = $db->prepare("INSERT INTO gallery (title, description, image_path) VALUES (:title, :description, :image_path)");
+                        $stmt->execute([
+                            ':title' => $title,
+                            ':description' => $description,
+                            ':image_path' => $image_path
+                        ]);
+                        setFlash('success', 'Gallery item uploaded successfully.');
+                    } catch (PDOException $e) {
+                        error_log('Add gallery error: ' . $e->getMessage());
+                        setFlash('error', 'Failed to save gallery item.');
+                    }
                 }
             }
         }
@@ -103,6 +136,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $id = (int)($_POST['gallery_id'] ?? 0);
             if ($id > 0) {
                 try {
+                    // Try to delete image file first
+                    $stmt = $db->prepare("SELECT image_path FROM gallery WHERE id = :id");
+                    $stmt->execute([':id' => $id]);
+                    $item = $stmt->fetch(PDO::FETCH_ASSOC);
+                    if ($item && !empty($item['image_path']) && file_exists(__DIR__ . '/' . $item['image_path'])) {
+                        unlink(__DIR__ . '/' . $item['image_path']);
+                    }
+
                     $stmt = $db->prepare("DELETE FROM gallery WHERE id = :id");
                     $stmt->execute([':id' => $id]);
                     setFlash('success', 'Gallery item deleted successfully.');
@@ -159,53 +200,60 @@ try {
 <body>
 <div class="dash-layout">
 
-  <aside class="dash-sidebar">
-    <div class="sidebar-logo">AI<span>Solutions</span></div>
-    <nav class="sidebar-nav">
-      <a href="index.php">🏠 &nbsp;Homepage</a>
-      <a href="dashboard.php?tab=inquiries" class="<?= $tab === 'inquiries' ? 'active' : '' ?>">📊 &nbsp;Inquiries (<?= $inquiriesCount ?>)</a>
-      <a href="dashboard.php?tab=blogs" class="<?= $tab === 'blogs' ? 'active' : '' ?>">✍️ &nbsp;Blogs (<?= $blogsCount ?>)</a>
-      <a href="dashboard.php?tab=gallery" class="<?= $tab === 'gallery' ? 'active' : '' ?>">🖼️ &nbsp;Gallery (<?= $galleryCount ?>)</a>
-    </nav>
-    <div class="sidebar-footer">
-      <p style="font-size:.78rem;color:var(--text-light);margin-bottom:8px;">
-        Signed in as <strong style="color:var(--text)"><?= e($_SESSION['username'] ?? 'Admin') ?></strong>
-      </p>
-      <a href="logout.php" class="btn btn-outline btn-sm" style="width:100%;justify-content:center;">Sign Out</a>
+  <!-- Navbar -->
+  <nav class="navbar" id="navbar">
+    <div class="container">
+      <a href="index.php" class="nav-logo">AI<span>Solutions</span></a>
+      <div class="nav-links" id="navLinks">
+        <a href="index.php">Homepage</a>
+        <a href="blog.php">Blog</a>
+        <a href="gallery.php">Gallery</a>
+        <a href="logout.php" class="nav-cta" style="background:transparent; color:var(--text-mid); border:1px solid var(--border);">Sign Out</a>
+      </div>
     </div>
-  </aside>
+  </nav>
 
   <div class="dash-main">
-    <div class="dash-topbar">
-      <h1>Admin Dashboard</h1>
-      <span class="user-info">Administrator</span>
-    </div>
-
     <div class="dash-content">
+      
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:32px; flex-wrap:wrap; gap:12px;">
+        <div>
+          <h1 style="font-family:'DM Serif Display', serif; font-size:2.2rem; font-weight:400; line-height:1.2;">Admin Workspace</h1>
+          <p style="color:var(--text-light); font-size:.9rem; margin-top:4px;">Signed in as <strong><?= e($_SESSION['username'] ?? 'Admin') ?></strong> (Administrator)</p>
+        </div>
+      </div>
+
       <?php if ($flash): ?>
-        <div class="flash flash-<?= e($flash['type']) ?>" style="margin-bottom:20px;"><?= e($flash['message']) ?></div>
+        <div class="flash flash-<?= e($flash['type']) ?>" style="margin-bottom:32px;"><?= e($flash['message']) ?></div>
       <?php endif; ?>
+
+      <!-- Dashboard Tabs -->
+      <div class="dash-tabs">
+        <a href="dashboard.php?tab=inquiries" class="dash-tab-btn <?= $tab === 'inquiries' ? 'active' : '' ?>">Inquiries (<?= $inquiriesCount ?>)</a>
+        <a href="dashboard.php?tab=blogs" class="dash-tab-btn <?= $tab === 'blogs' ? 'active' : '' ?>">Blog Manager (<?= $blogsCount ?>)</a>
+        <a href="dashboard.php?tab=gallery" class="dash-tab-btn <?= $tab === 'gallery' ? 'active' : '' ?>">Gallery Manager (<?= $galleryCount ?>)</a>
+      </div>
 
       <?php if ($tab === 'inquiries'): ?>
         <!-- ── TAB: INQUIRIES ────────────────────────────── -->
-        <div class="stat-cards">
+        <div class="stat-cards" style="margin-bottom:32px;">
           <div class="stat-card accent">
-            <div class="label">Total</div>
+            <div class="label">Total Inquiries</div>
             <div class="value"><?= $inquiriesCount ?></div>
           </div>
           <div class="stat-card yellow">
-            <div class="label">Pending</div>
+            <div class="label">Pending Review</div>
             <div class="value"><?= $pendingCount ?></div>
           </div>
           <div class="stat-card green">
-            <div class="label">Verified</div>
+            <div class="label">Verified Clients</div>
             <div class="value"><?= $verifiedCount ?></div>
           </div>
         </div>
 
         <div class="card">
           <div class="card-header">
-            <h2>All Inquiries</h2>
+            <h2>All Project Inquiries</h2>
           </div>
           <?php if ($inquiriesCount > 0): ?>
           <div class="table-wrap">
@@ -257,7 +305,7 @@ try {
                         <button type="submit" class="btn btn-success btn-sm">Verify</button>
                       </form>
                     <?php else: ?>
-                      <span style="color:var(--green);font-size:.8rem;font-weight:700;">✓ Done</span>
+                      <span style="color:var(--green);font-size:.8rem;font-weight:700;">✓ Verified</span>
                     <?php endif; ?>
                   </td>
                 </tr>
@@ -267,7 +315,7 @@ try {
           </div>
           <?php else: ?>
           <div style="text-align:center;padding:48px 24px;color:var(--text-mid);">
-            <div style="font-size:2rem;margin-bottom:10px;">📭</div>
+            <svg viewBox="0 0 24 24" style="width:48px; height:48px; stroke:var(--text-light); fill:none; stroke-width:2; margin-bottom:12px; display:inline-block;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             <p style="font-weight:600;">No inquiries yet.</p>
             <p style="font-size:.88rem;margin-top:4px;">User submissions will appear here.</p>
           </div>
@@ -276,7 +324,7 @@ try {
 
       <?php elseif ($tab === 'blogs'): ?>
         <!-- ── TAB: BLOGS ────────────────────────────────── -->
-        <div style="display: grid; grid-template-columns: 1.1fr 2fr; gap: 24px;" class="dash-grid-responsive">
+        <div style="display: grid; grid-template-columns: 1.1fr 2fr; gap: 32px;" class="dash-grid-responsive">
           <div class="card">
             <div class="card-header">
               <h2>Add Blog Post</h2>
@@ -295,14 +343,9 @@ try {
                 <input type="text" id="category" name="category" placeholder="e.g. AI Article, Company News" required>
               </div>
 
-              <div class="form-group" style="margin-bottom: 12px;">
-                <label for="icon">Icon Emoji *</label>
-                <input type="text" id="icon" name="icon" placeholder="e.g. 🧠, 🚀, 📋" value="🧠" required>
-              </div>
-
               <div class="form-group" style="margin-bottom: 16px;">
                 <label for="content">Short Content / Summary *</label>
-                <textarea id="content" name="content" placeholder="A short description or summary of the blog post..." style="min-height: 100px;" required></textarea>
+                <textarea id="content" name="content" placeholder="A short description or summary of the blog post..." style="min-height: 120px;" required></textarea>
               </div>
 
               <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Publish Post</button>
@@ -318,7 +361,7 @@ try {
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>Post</th>
+                    <th>Post Details</th>
                     <th>Category</th>
                     <th>Action</th>
                   </tr>
@@ -327,8 +370,19 @@ try {
                   <?php foreach ($blogs as $post): ?>
                   <tr>
                     <td>
-                      <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-size: 1.5rem;"><?= e($post['icon']) ?></span>
+                      <div style="display: flex; align-items: flex-start; gap: 12px;">
+                        <?php
+                          $cat = strtolower($post['category'] ?? '');
+                          $svg_path = '<path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>'; // doc template
+                          if (str_contains($cat, 'agent') || str_contains($cat, 'assistant') || str_contains($cat, 'ai')) {
+                              $svg_path = '<path d="M12 2a10 10 0 0 0-10 10c0 5.523 4.477 10 10 10s10-4.477 10-10A10 10 0 0 0 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/><path d="M12 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-4 7h8v2H8z"/>';
+                          } elseif (str_contains($cat, 'dev') || str_contains($cat, 'code') || str_contains($cat, 'soft') || str_contains($cat, 'engine')) {
+                              $svg_path = '<path d="M16.5 9.4 12 14.1l-4.5-4.7L6 10.8l6 6.3 6-6.3-1.5-1.4z"/><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12z"/>';
+                          }
+                        ?>
+                        <div style="background: var(--bg-soft); padding: 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; margin-top: 4px;">
+                          <svg class="svg-icon" style="width:20px; height:20px; color:var(--accent);" viewBox="0 0 24 24"><?= $svg_path ?></svg>
+                        </div>
                         <div>
                           <strong><?= e($post['title']) ?></strong>
                           <p style="font-size: .8rem; color: var(--text-mid); max-width: 320px; white-space: pre-wrap; margin-top: 4px;"><?= e($post['content']) ?></p>
@@ -359,12 +413,12 @@ try {
 
       <?php elseif ($tab === 'gallery'): ?>
         <!-- ── TAB: GALLERY ──────────────────────────────── -->
-        <div style="display: grid; grid-template-columns: 1.1fr 2fr; gap: 24px;" class="dash-grid-responsive">
+        <div style="display: grid; grid-template-columns: 1.1fr 2fr; gap: 32px;" class="dash-grid-responsive">
           <div class="card">
             <div class="card-header">
               <h2>Add Gallery Item</h2>
             </div>
-            <form method="POST" action="dashboard.php?tab=gallery" style="margin-top: 10px;">
+            <form method="POST" action="dashboard.php?tab=gallery" enctype="multipart/form-data" style="margin-top: 10px;">
               <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
               <input type="hidden" name="action" value="add_gallery">
               
@@ -374,18 +428,9 @@ try {
               </div>
 
               <div class="form-group" style="margin-bottom: 12px;">
-                <label for="icon">Icon Emoji *</label>
-                <input type="text" id="icon" name="icon" placeholder="e.g. 💻, 📢, 🤝, 💡" value="📷" required>
-              </div>
-
-              <div class="form-group" style="margin-bottom: 12px;">
-                <label for="color_theme">Color Theme *</label>
-                <select id="color_theme" name="color_theme" style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--white); font-family: inherit;">
-                  <option value="purple">Purple</option>
-                  <option value="yellow">Yellow</option>
-                  <option value="green">Green</option>
-                  <option value="red">Red</option>
-                </select>
+                <label for="image">Upload Image *</label>
+                <input type="file" id="image" name="image" accept="image/*" required style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--white);">
+                <span style="font-size: 0.78rem; color: var(--text-light); display: block; margin-top: 4px;">Formats: PNG, JPG, JPEG, WEBP. Max size: 5MB.</span>
               </div>
 
               <div class="form-group" style="margin-bottom: 16px;">
@@ -393,7 +438,7 @@ try {
                 <textarea id="description" name="description" placeholder="Describe the team activity..." style="min-height: 80px;" required></textarea>
               </div>
 
-              <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Add Item</button>
+              <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Upload Gallery Item</button>
             </form>
           </div>
 
@@ -406,8 +451,7 @@ try {
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>Item</th>
-                    <th>Theme</th>
+                    <th>Item Details</th>
                     <th>Action</th>
                   </tr>
                 </thead>
@@ -415,15 +459,20 @@ try {
                   <?php foreach ($gallery as $item): ?>
                   <tr>
                     <td>
-                      <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-size: 1.5rem;"><?= e($item['icon']) ?></span>
+                      <div style="display: flex; align-items: center; gap: 12px;">
+                        <?php if (!empty($item['image_path'])): ?>
+                          <img src="<?= e($item['image_path']) ?>" alt="" style="width: 48px; height: 48px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                        <?php else: ?>
+                          <div style="width: 48px; height: 48px; background: var(--bg-soft); border-radius: var(--radius-sm); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;">
+                            <svg class="svg-icon" style="width: 20px; height: 20px; color: var(--text-light);" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                          </div>
+                        <?php endif; ?>
                         <div>
                           <strong><?= e($item['title']) ?></strong>
                           <p style="font-size: .8rem; color: var(--text-mid); max-width: 320px; white-space: pre-wrap; margin-top: 4px;"><?= e($item['description']) ?></p>
                         </div>
                       </div>
                     </td>
-                    <td><span class="status-badge status-<?= e($item['color_theme']) ?>"><?= ucfirst(e($item['color_theme'])) ?></span></td>
                     <td>
                       <form method="POST" action="dashboard.php?tab=gallery" style="margin: 0;" onsubmit="return confirm('Delete this gallery item?');">
                         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">

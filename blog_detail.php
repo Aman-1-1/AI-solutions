@@ -58,7 +58,18 @@ if (!$post) {
 
   <article class="card" style="padding: 40px 32px; box-shadow: var(--shadow-lg);">
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px;">
-      <span style="font-size: 2.2rem; background: var(--bg-soft); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);"><?= e($post['icon']) ?></span>
+      <?php
+        $cat = strtolower($post['category'] ?? '');
+        $svg_path = '<path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>'; // doc template
+        if (str_contains($cat, 'agent') || str_contains($cat, 'assistant') || str_contains($cat, 'ai')) {
+            $svg_path = '<path d="M12 2a10 10 0 0 0-10 10c0 5.523 4.477 10 10 10s10-4.477 10-10A10 10 0 0 0 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/><path d="M12 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-4 7h8v2H8z"/>';
+        } elseif (str_contains($cat, 'dev') || str_contains($cat, 'code') || str_contains($cat, 'soft') || str_contains($cat, 'engine')) {
+            $svg_path = '<path d="M16.5 9.4 12 14.1l-4.5-4.7L6 10.8l6 6.3 6-6.3-1.5-1.4z"/><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12z"/>';
+        }
+      ?>
+      <div style="background: var(--bg-soft); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;">
+        <svg class="svg-icon" style="width:24px; height:24px; color:var(--accent);" viewBox="0 0 24 24"><?= $svg_path ?></svg>
+      </div>
       <div>
         <span class="status-badge status-purple" style="font-size: 0.72rem; text-transform: uppercase; font-weight: 700;"><?= e($post['category']) ?></span>
         <div style="font-size: 0.8rem; color: var(--text-light); margin-top: 4px;"><?= date('M d, Y', strtotime($post['created_at'])) ?> · Published by Administrator</div>

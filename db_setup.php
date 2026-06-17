@@ -92,9 +92,17 @@ try {
             description TEXT    NOT NULL,
             icon        TEXT    NOT NULL DEFAULT '📷',
             color_theme TEXT    NOT NULL DEFAULT 'purple',
+            image_path  TEXT    DEFAULT NULL,
             created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
         )
     ");
+    // Migration check for gallery
+    $stmt = $db->query("PRAGMA table_info(gallery)");
+    $cols = array_column($stmt->fetchAll(), 'name');
+    if (!in_array('image_path', $cols)) {
+        $db->exec("ALTER TABLE gallery ADD COLUMN image_path TEXT DEFAULT NULL");
+        echo "[✓] Migrated 'gallery' table: added 'image_path' column.\n";
+    }
     echo "[✓] Table 'gallery' created/verified.\n";
 
     // Seed blogs if empty

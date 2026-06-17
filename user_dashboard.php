@@ -44,51 +44,52 @@ $pendingCount = $totalInquiries - $verifiedCount;
 <body>
 <div class="dash-layout">
 
-  <aside class="dash-sidebar">
-    <div class="sidebar-logo">AI<span>Solutions</span></div>
-    <nav class="sidebar-nav">
-      <a href="index.php">🏠 &nbsp;Homepage</a>
-      <a href="user_dashboard.php" class="active">📋 &nbsp;My Inquiries</a>
-      <a href="index.php#contact">✉️ &nbsp;New Request</a>
-    </nav>
-    <div class="sidebar-footer">
-      <p style="font-size:.78rem;color:var(--text-light);margin-bottom:8px;">
-        Signed in as <strong style="color:var(--text)"><?= e($username) ?></strong>
-      </p>
-      <a href="logout.php" class="btn btn-outline btn-sm" style="width:100%;justify-content:center;">Sign Out</a>
+  <!-- Navbar -->
+  <nav class="navbar" id="navbar">
+    <div class="container">
+      <a href="index.php" class="nav-logo">AI<span>Solutions</span></a>
+      <div class="nav-links" id="navLinks">
+        <a href="index.php">Homepage</a>
+        <a href="blog.php">Blog</a>
+        <a href="gallery.php">Gallery</a>
+        <a href="logout.php" class="nav-cta" style="background:transparent; color:var(--text-mid); border:1px solid var(--border);">Sign Out</a>
+      </div>
     </div>
-  </aside>
+  </nav>
 
   <div class="dash-main">
-    <div class="dash-topbar">
-      <h1>My Account</h1>
-      <span class="user-info">Welcome back, <?= e($username) ?></span>
-    </div>
-
     <div class="dash-content">
+      
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:32px; flex-wrap:wrap; gap:12px;">
+        <div>
+          <h1 style="font-family:'DM Serif Display', serif; font-size:2.2rem; font-weight:400; line-height:1.2;">My Workspace</h1>
+          <p style="color:var(--text-light); font-size:.9rem; margin-top:4px;">Welcome back, <strong><?= e($username) ?></strong></p>
+        </div>
+        <a href="index.php#contact" class="btn btn-primary">+ Submit New Inquiry</a>
+      </div>
+
       <?php if ($flash): ?>
-        <div class="flash flash-<?= e($flash['type']) ?>" style="margin-bottom:20px;"><?= e($flash['message']) ?></div>
+        <div class="flash flash-<?= e($flash['type']) ?>" style="margin-bottom:32px;"><?= e($flash['message']) ?></div>
       <?php endif; ?>
 
-      <div class="stat-cards">
+      <div class="stat-cards" style="margin-bottom:32px;">
         <div class="stat-card accent">
-          <div class="label">Submitted</div>
+          <div class="label">Total Submitted</div>
           <div class="value"><?= $totalInquiries ?></div>
         </div>
         <div class="stat-card yellow">
-          <div class="label">Pending</div>
+          <div class="label">Pending Review</div>
           <div class="value"><?= $pendingCount ?></div>
         </div>
         <div class="stat-card green">
-          <div class="label">Verified</div>
+          <div class="label">Verified Requests</div>
           <div class="value"><?= $verifiedCount ?></div>
         </div>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <h2>Your Inquiries</h2>
-          <a href="index.php#contact" class="btn btn-primary btn-sm">+ New Request</a>
+          <h2>Your Project Inquiries</h2>
         </div>
 
         <?php if ($totalInquiries > 0): ?>
@@ -119,7 +120,7 @@ $pendingCount = $totalInquiries - $verifiedCount;
         </div>
         <?php else: ?>
         <div style="text-align:center;padding:48px 24px;color:var(--text-mid);">
-          <div style="font-size:2rem;margin-bottom:10px;">📩</div>
+          <svg viewBox="0 0 24 24" style="width:48px; height:48px; stroke:var(--text-light); fill:none; stroke-width:2; margin-bottom:12px; display:inline-block;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           <p style="font-weight:600;">No requests yet.</p>
           <p style="font-size:.88rem;margin-top:4px;margin-bottom:20px;">Submit your first inquiry to get started.</p>
           <a href="index.php#contact" class="btn btn-primary">Submit a Request</a>
